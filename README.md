@@ -32,7 +32,10 @@ uvicorn app.main:app --reload --port 8000
 ```
 
 - Health: http://127.0.0.1:8000/health  
+- Keitaro status: http://127.0.0.1:8000/keitaro/status  
 - Swagger: http://127.0.0.1:8000/docs  
+
+Заполни `KEITARO_URL` и `KEITARO_API_KEY` в `backend/.env`, затем проверь `/keitaro/status`.
 
 ## Frontend
 
