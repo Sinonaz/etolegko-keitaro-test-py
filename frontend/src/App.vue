@@ -3,10 +3,12 @@ import { onMounted, ref } from 'vue'
 import CreateCampaignForm, {
   type CreatedCampaign,
 } from './components/CreateCampaignForm.vue'
+import StreamsEditor from './components/StreamsEditor.vue'
 
 const health = ref<string>('…')
 const campaigns = ref<CreatedCampaign[]>([])
 const listError = ref<string | null>(null)
+const selectedCampaignId = ref<string | null>(null)
 
 onMounted(async () => {
   try {
@@ -31,6 +33,7 @@ async function loadCampaigns() {
 
 function onCreated(campaign: CreatedCampaign) {
   campaigns.value = [campaign, ...campaigns.value]
+  selectedCampaignId.value = campaign.id
 }
 </script>
 
@@ -41,26 +44,36 @@ function onCreated(campaign: CreatedCampaign) {
       <p class="hint">Backend health: <strong>{{ health }}</strong></p>
     </header>
 
-    <CreateCampaignForm @created="onCreated" />
+    <StreamsEditor
+      v-if="selectedCampaignId"
+      :campaign-id="selectedCampaignId"
+      @close="selectedCampaignId = null"
+    />
 
-    <section class="list">
-      <h2>Created campaigns</h2>
-      <p v-if="listError" class="err">{{ listError }}</p>
-      <p v-else-if="!campaigns.length" class="hint">No local campaigns yet.</p>
-      <ul v-else>
-        <li v-for="c in campaigns" :key="c.id">
-          <strong>{{ c.name }}</strong>
-          — geo {{ c.geo }}, offer {{ c.offer_id }}, KT #{{ c.keitaro_campaign_id }}
-        </li>
-      </ul>
-    </section>
+    <template v-else>
+      <CreateCampaignForm @created="onCreated" />
+
+      <section class="list">
+        <h2>Created campaigns</h2>
+        <p v-if="listError" class="err">{{ listError }}</p>
+        <p v-else-if="!campaigns.length" class="hint">No local campaigns yet.</p>
+        <ul v-else>
+          <li v-for="c in campaigns" :key="c.id">
+            <button type="button" class="camp" @click="selectedCampaignId = c.id">
+              <strong>{{ c.name }}</strong>
+              — geo {{ c.geo }}, offer {{ c.offer_id }}, KT #{{ c.keitaro_campaign_id }}
+            </button>
+          </li>
+        </ul>
+      </section>
+    </template>
   </main>
 </template>
 
 <style scoped>
 .page {
   font-family: system-ui, sans-serif;
-  max-width: 40rem;
+  max-width: 52rem;
   margin: 2rem auto;
   padding: 0 1rem;
   display: flex;
@@ -84,7 +97,24 @@ function onCreated(campaign: CreatedCampaign) {
 
 .list ul {
   margin: 0;
-  padding-left: 1.2rem;
+  padding: 0;
+  list-style: none;
+}
+
+.camp {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 4px;
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.4rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.camp:hover {
+  background: #f5f8ff;
 }
 
 .err {

@@ -35,6 +35,7 @@ uvicorn app.main:app --reload --port 8000
 - Keitaro status: http://127.0.0.1:8000/keitaro/status  
 - Create campaign: `POST /campaigns` `{name, geo, offer_id}`  
 - Offer search: `GET /offers/search?q=...`  
+- Streams editor: `GET/POST /campaigns/{id}/streams/...` (fetch, add/remove/pin, push, cancel)  
 - Swagger: http://127.0.0.1:8000/docs  
 
 Заполни `KEITARO_URL` и `KEITARO_API_KEY` в `backend/.env` (и при необходимости ID/имена домена, группы `FORTESTS`, источника). Проверь `/keitaro/status`.
