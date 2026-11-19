@@ -1,7 +1,46 @@
+:root {
+  --ink: #1c1917;
+  --muted: #78716c;
+  --surface: rgba(255, 252, 248, 0.78);
+  --line: #e7e5e4;
+  --teal: #0f766e;
+  --teal-soft: #ccfbf1;
+}
+
 * {
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
+  color: var(--ink);
+  font-family: 'Outfit', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #99f6e4 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #fed7aa 0%, transparent 50%),
+    linear-gradient(165deg, #fff7ed 0%, #f5f5f4 42%, #ecfeff 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(28, 25, 23, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(28, 25, 23, 0.03) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to bottom, black, transparent 85%);
+}
+
+a {
+  color: var(--teal);
 }

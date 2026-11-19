@@ -1,5 +1,16 @@
 <script setup lang="ts">
+import {
+  NAlert,
+  NAutoComplete,
+  NButton,
+  NForm,
+  NFormItem,
+  NInput,
+  NSpace,
+  NText,
+} from 'naive-ui'
 import { computed, ref, watch } from 'vue'
+import { formatApiError } from '../utils/errors'
 
 export type CreatedCampaign = {
   id: string
@@ -37,9 +48,19 @@ const canSubmit = computed(
     !loading.value,
 )
 
+const offerOptions = computed(() =>
+  suggestions.value.map((offer) => ({
+    label: `${offer.id} — ${offer.name}`,
+    value: String(offer.id),
+  })),
+)
+
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(offerQuery, (value) => {
+  if (selectedOffer.value && value === `${selectedOffer.value.id} — ${selectedOffer.value.name}`) {
+    return
+  }
   selectedOffer.value = null
   if (searchTimer) clearTimeout(searchTimer)
   const q = value.trim()
@@ -57,7 +78,7 @@ async function searchOffers(q: string) {
     const res = await fetch(`/api/offers/search?q=${encodeURIComponent(q)}`)
     if (!res.ok) {
       const body = await res.json().catch(() => null)
-      throw new Error(formatError(body) || `Search failed (${res.status})`)
+      throw new Error(formatApiError(body) || `Search failed (${res.status})`)
     }
     suggestions.value = (await res.json()) as OfferSuggestion[]
   } catch (e) {
@@ -68,7 +89,9 @@ async function searchOffers(q: string) {
   }
 }
 
-function pickOffer(offer: OfferSuggestion) {
+function onSelectOffer(value: string) {
+  const offer = suggestions.value.find((item) => String(item.id) === value)
+  if (!offer) return
   selectedOffer.value = offer
   offerQuery.value = `${offer.id} — ${offer.name}`
   suggestions.value = []
@@ -91,10 +114,10 @@ async function onSubmit() {
     })
     const body = await res.json().catch(() => null)
     if (!res.ok) {
-      throw new Error(formatError(body) || `Create failed (${res.status})`)
+      throw new Error(formatApiError(body) || `Create failed (${res.status})`)
     }
     const campaign = body as CreatedCampaign
-    success.value = `Created in Keitaro #${campaign.keitaro_campaign_id} (alias: ${campaign.keitaro_alias})`
+    success.value = `Кампания создана в Keitaro #${campaign.keitaro_campaign_id} (${campaign.keitaro_alias})`
     emit('created', campaign)
     name.value = ''
     geo.value = ''
@@ -106,153 +129,81 @@ async function onSubmit() {
     loading.value = false
   }
 }
-
-function formatError(body: unknown): string | null {
-  if (!body || typeof body !== 'object') return null
-  const detail = (body as { detail?: unknown }).detail
-  if (typeof detail === 'string') return detail
-  if (detail && typeof detail === 'object' && 'message' in detail) {
-    return String((detail as { message: unknown }).message)
-  }
-  if (Array.isArray(detail)) {
-    return detail
-      .map((item) => (typeof item === 'object' && item && 'msg' in item ? String(item.msg) : String(item)))
-      .join('; ')
-  }
-  return null
-}
 </script>
 
 <template>
-  <form class="form" @submit.prevent="onSubmit">
-    <h2>New campaign</h2>
+  <div>
+    <h2 class="title">New campaign</h2>
+    <NText depth="3" class="subtitle">
+      Имя, гео-фильтр на Google и оффер для остального трафика.
+    </NText>
 
-    <label class="field">
-      <span>Name</span>
-      <input v-model="name" type="text" placeholder="имя кампании" required />
-    </label>
+    <NForm class="form" @submit.prevent="onSubmit">
+      <NFormItem label="Name" :show-feedback="false">
+        <NInput v-model:value="name" placeholder="имя кампании" clearable />
+      </NFormItem>
 
-    <label class="field">
-      <span>Geo</span>
-      <input v-model="geo" type="text" placeholder="MX, AU, RO, ..." required />
-    </label>
+      <NFormItem label="Geo" :show-feedback="false">
+        <NInput v-model:value="geo" placeholder="AU, MX, RO…" clearable />
+      </NFormItem>
 
-    <div class="field">
-      <span>Offer</span>
-      <input
-        v-model="offerQuery"
-        type="text"
-        placeholder="поиск по офферам с автокомплитом"
-        autocomplete="off"
-      />
-      <p v-if="searching" class="meta">Searching…</p>
-      <ul v-if="suggestions.length" class="suggest">
-        <li v-for="offer in suggestions" :key="offer.id">
-          <button type="button" @click="pickOffer(offer)">
-            <strong>{{ offer.id }}</strong> — {{ offer.name }}
-          </button>
-        </li>
-      </ul>
-      <p v-if="selectedOffer" class="meta ok">
-        Selected: #{{ selectedOffer.id }}
-      </p>
-    </div>
+      <NFormItem label="Offer" :show-feedback="false">
+        <NAutoComplete
+          v-model:value="offerQuery"
+          :options="offerOptions"
+          :loading="searching"
+          placeholder="поиск по офферам с автокомплитом"
+          clearable
+          blur-after-select
+          @select="onSelectOffer"
+        />
+      </NFormItem>
 
-    <button class="submit" type="submit" :disabled="!canSubmit">
-      {{ loading ? 'Creating…' : 'Create' }}
-    </button>
+      <NSpace vertical :size="12">
+        <NText v-if="selectedOffer" depth="3">
+          Выбран оффер #{{ selectedOffer.id }}
+        </NText>
+        <NButton
+          type="primary"
+          attr-type="submit"
+          block
+          size="large"
+          :disabled="!canSubmit"
+          :loading="loading"
+        >
+          Create
+        </NButton>
+      </NSpace>
+    </NForm>
 
-    <p v-if="error" class="msg err">{{ error }}</p>
-    <p v-if="success" class="msg ok">{{ success }}</p>
-  </form>
+    <NAlert v-if="error" class="alert" type="error" :bordered="false">
+      {{ error }}
+    </NAlert>
+    <NAlert v-if="success" class="alert" type="success" :bordered="false">
+      {{ success }}
+    </NAlert>
+  </div>
 </template>
 
 <style scoped>
+.title {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  display: block;
+  margin: 0.35rem 0 1rem;
+}
+
 .form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  max-width: 28rem;
+  gap: 0.15rem;
 }
 
-h2 {
-  margin: 0;
-  font-size: 1.4rem;
-}
-
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.field > span {
-  font-size: 0.85rem;
-  color: #444;
-}
-
-input {
-  border: 1px solid #c8c8c8;
-  border-radius: 4px;
-  padding: 0.55rem 0.65rem;
-  font: inherit;
-}
-
-.suggest {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  max-height: 12rem;
-  overflow: auto;
-}
-
-.suggest button {
-  width: 100%;
-  text-align: left;
-  border: 0;
-  background: #fff;
-  padding: 0.5rem 0.65rem;
-  font: inherit;
-  cursor: pointer;
-}
-
-.suggest button:hover {
-  background: #f3f7ff;
-}
-
-.submit {
-  border: 1px solid #9db7e8;
-  background: #cfe0ff;
-  border-radius: 4px;
-  padding: 0.7rem 1rem;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.submit:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.meta {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #666;
-}
-
-.msg {
-  margin: 0;
-  font-size: 0.9rem;
-}
-
-.ok {
-  color: #0a7a2f;
-}
-
-.err {
-  color: #b00020;
+.alert {
+  margin-top: 1rem;
 }
 </style>

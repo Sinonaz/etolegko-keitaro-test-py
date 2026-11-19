@@ -1,5 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import {
+  NAlert,
+  NAutoComplete,
+  NButton,
+  NDataTable,
+  NSpace,
+  NTag,
+  NText,
+} from 'naive-ui'
+import type { DataTableColumns } from 'naive-ui'
+import { computed, h, onMounted, ref, watch } from 'vue'
+import { formatApiError } from '../utils/errors'
 
 type OfferRow = {
   offer_id: number
@@ -44,7 +55,9 @@ const suggestions = ref<Record<number, OfferSuggestion[]>>({})
 const searchTimers: Record<number, ReturnType<typeof setTimeout> | undefined> = {}
 
 const dirtyStreamIds = computed(() =>
-  (state.value?.streams || []).filter((s) => s.dirty).map((s) => s.keitaro_stream_id),
+  (state.value?.streams || [])
+    .filter((s) => s.dirty)
+    .map((s) => s.keitaro_stream_id),
 )
 
 onMounted(() => {
@@ -142,57 +155,128 @@ async function addOffer(streamId: number, offerId: number) {
   suggestions.value[streamId] = []
 }
 
+function offerOptions(streamId: number) {
+  return (suggestions.value[streamId] || []).map((offer) => ({
+    label: `${offer.id} — ${offer.name}`,
+    value: String(offer.id),
+  }))
+}
+
 async function readError(res: Response): Promise<string> {
   const body = await res.json().catch(() => null)
-  if (body && typeof body === 'object' && 'detail' in body) {
-    const detail = (body as { detail: unknown }).detail
-    if (typeof detail === 'string') return detail
-    if (detail && typeof detail === 'object' && 'message' in detail) {
-      return String((detail as { message: unknown }).message)
-    }
-  }
-  return `HTTP ${res.status}`
+  return formatApiError(body) || `HTTP ${res.status}`
 }
 
 function visibleOffers(stream: StreamRow): OfferRow[] {
   if (showAll.value) return stream.offers
   return stream.offers.filter((o) => !o.removed)
 }
+
+function columnsFor(stream: StreamRow): DataTableColumns<OfferRow> {
+  return [
+    {
+      title: 'Offer',
+      key: 'offer_name',
+      render(row) {
+        return h(
+          'div',
+          { class: row.removed ? 'removed' : undefined },
+          [
+            row.offer_name,
+            row.removed
+              ? h(NText, { depth: 3 }, { default: () => ' (removed)' })
+              : null,
+          ],
+        )
+      },
+    },
+    {
+      title: 'Share',
+      key: 'share',
+      width: 120,
+      render(row) {
+        return h(
+          NButton,
+          {
+            text: true,
+            type: 'primary',
+            disabled: row.removed || busy.value,
+            onClick: () => togglePin(stream.keitaro_stream_id, row),
+          },
+          {
+            default: () =>
+              `${row.share}%${row.pinned ? ' · pinned' : ''}`,
+          },
+        )
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 140,
+      render(row) {
+        if (row.removed) {
+          return h(
+            NButton,
+            {
+              size: 'small',
+              disabled: busy.value,
+              onClick: () => bringBack(stream.keitaro_stream_id, row.offer_id),
+            },
+            { default: () => 'Bring back' },
+          )
+        }
+        return h(
+          NButton,
+          {
+            size: 'small',
+            secondary: true,
+            type: 'error',
+            disabled: busy.value,
+            onClick: () => removeOffer(stream.keitaro_stream_id, row.offer_id),
+          },
+          { default: () => 'Remove' },
+        )
+      },
+    },
+  ]
+}
 </script>
 
 <template>
-  <section class="editor">
+  <section class="editor panel">
     <header class="bar">
       <div>
-        <button type="button" class="link" @click="emit('close')">← Campaigns</button>
+        <NButton text type="primary" @click="emit('close')">← Кампании</NButton>
         <h2>
           {{ state?.campaign_name || '…' }}
           <span class="muted">/ Keitaro Streams</span>
         </h2>
       </div>
-      <div class="actions">
-        <button type="button" :disabled="busy" @click="fetchFromKt">
-          Fetch streams from KT
-        </button>
-        <a
+      <NSpace>
+        <NButton :disabled="busy" :loading="busy" @click="fetchFromKt">
+          Fetch from KT
+        </NButton>
+        <NButton
           v-if="state?.keitaro_admin_url"
-          class="buttonish"
+          tag="a"
           :href="state.keitaro_admin_url"
           target="_blank"
           rel="noreferrer"
+          secondary
         >
           View in KT
-        </a>
-        <button type="button" @click="showAll = !showAll">
+        </NButton>
+        <NButton secondary @click="showAll = !showAll">
           {{ showAll ? 'Hide removed' : 'Show all offers' }}
-        </button>
-      </div>
+        </NButton>
+      </NSpace>
     </header>
 
-    <p v-if="error" class="err">{{ error }}</p>
-    <p v-if="!state?.streams.length" class="muted">
-      No streams loaded yet — press “Fetch streams from KT”.
-    </p>
+    <NAlert v-if="error" type="error" :bordered="false">{{ error }}</NAlert>
+    <NText v-if="!state?.streams.length" depth="3">
+      Потоки ещё не загружены — нажми “Fetch from KT”.
+    </NText>
 
     <article
       v-for="stream in state?.streams || []"
@@ -201,233 +285,123 @@ function visibleOffers(stream: StreamRow): OfferRow[] {
     >
       <div class="stream-head">
         <div>
-          <strong>
-            Stream: {{ stream.name }} (#{{ stream.position || stream.keitaro_stream_id }})
-          </strong>
-          <span class="muted">
-            filter by {{ stream.filter_summary }}, stream_id
-            {{ stream.keitaro_stream_id }}
-          </span>
+          <NSpace align="center" :size="8">
+            <strong>
+              {{ stream.name }}
+            </strong>
+            <NTag size="small" :bordered="false">
+              #{{ stream.position || stream.keitaro_stream_id }}
+            </NTag>
+            <NTag v-if="stream.dirty" size="small" type="warning" :bordered="false">
+              unsaved
+            </NTag>
+          </NSpace>
+          <NText depth="3" class="meta">
+            filter {{ stream.filter_summary }} · stream_id {{ stream.keitaro_stream_id }}
+          </NText>
         </div>
-        <div v-if="stream.editable && stream.dirty" class="actions">
-          <button type="button" class="primary" :disabled="busy" @click="pushStream(stream.keitaro_stream_id)">
+        <NSpace v-if="stream.editable && stream.dirty">
+          <NButton
+            type="primary"
+            :disabled="busy"
+            :loading="busy"
+            @click="pushStream(stream.keitaro_stream_id)"
+          >
             Push to KT
-          </button>
-          <button type="button" :disabled="busy" @click="cancelStream(stream.keitaro_stream_id)">
+          </NButton>
+          <NButton :disabled="busy" @click="cancelStream(stream.keitaro_stream_id)">
             Cancel
-          </button>
-        </div>
+          </NButton>
+        </NSpace>
       </div>
 
-      <table v-if="stream.editable">
-        <thead>
-          <tr>
-            <th>Offer</th>
-            <th>Share</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="offer in visibleOffers(stream)"
-            :key="offer.offer_id"
-            :class="{ removed: offer.removed }"
-          >
-            <td>
-              {{ offer.offer_name }}
-              <span v-if="offer.removed" class="muted">(removed)</span>
-            </td>
-            <td>
-              <button
-                type="button"
-                class="share"
-                :disabled="offer.removed || busy"
-                :title="offer.pinned ? 'Unpin' : 'Pin share'"
-                @click="togglePin(stream.keitaro_stream_id, offer)"
-              >
-                {{ offer.share }}%{{ offer.pinned ? ' (pinned)' : '' }}
-              </button>
-            </td>
-            <td>
-              <button
-                v-if="!offer.removed"
-                type="button"
-                :disabled="busy"
-                @click="removeOffer(stream.keitaro_stream_id, offer.offer_id)"
-              >
-                Remove
-              </button>
-              <button
-                v-else
-                type="button"
-                :disabled="busy"
-                @click="bringBack(stream.keitaro_stream_id, offer.offer_id)"
-              >
-                Bring back
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div v-if="stream.editable" class="add">
-        <input
-          :value="offerQuery[stream.keitaro_stream_id] || ''"
-          type="text"
-          placeholder="Search offer to add"
-          @input="onOfferInput(stream.keitaro_stream_id, ($event.target as HTMLInputElement).value)"
+      <template v-if="stream.editable">
+        <NDataTable
+          :columns="columnsFor(stream)"
+          :data="visibleOffers(stream)"
+          :bordered="false"
+          :single-line="false"
+          size="small"
         />
-        <ul v-if="(suggestions[stream.keitaro_stream_id] || []).length" class="suggest">
-          <li
-            v-for="s in suggestions[stream.keitaro_stream_id]"
-            :key="s.id"
-          >
-            <button type="button" :disabled="busy" @click="addOffer(stream.keitaro_stream_id, s.id)">
-              {{ s.id }} — {{ s.name }}
-            </button>
-          </li>
-        </ul>
-      </div>
 
-      <p v-else class="muted">Read-only stream ({{ stream.stream_schema || stream.stream_type }}).</p>
+        <div class="add">
+          <NAutoComplete
+            :value="offerQuery[stream.keitaro_stream_id] || ''"
+            :options="offerOptions(stream.keitaro_stream_id)"
+            placeholder="Добавить оффер…"
+            clearable
+            @update:value="(v: string) => onOfferInput(stream.keitaro_stream_id, v)"
+            @select="(v: string) => addOffer(stream.keitaro_stream_id, Number(v))"
+          />
+        </div>
+      </template>
+
+      <NText v-else depth="3">
+        Read-only stream ({{ stream.stream_schema || stream.stream_type }}).
+      </NText>
     </article>
 
-    <p v-if="dirtyStreamIds.length" class="muted">
-      Unsaved streams: {{ dirtyStreamIds.join(', ') }}
-    </p>
+    <NText v-if="dirtyStreamIds.length" depth="3">
+      Несохранённые потоки: {{ dirtyStreamIds.join(', ') }}
+    </NText>
   </section>
 </template>
 
 <style scoped>
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1.25rem 1.35rem 1.5rem;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 40px rgba(28, 25, 23, 0.05);
+}
+
 .editor {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.15rem;
 }
 
 .bar,
-.stream-head,
-.actions {
+.stream-head {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
+  gap: 0.75rem;
+  align-items: flex-start;
   justify-content: space-between;
 }
 
 .bar h2 {
-  margin: 0.25rem 0 0;
-  font-size: 1.15rem;
-}
-
-.stream {
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 0.75rem;
-  background: #fafafa;
-}
-
-.stream-head {
-  margin-bottom: 0.75rem;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
-}
-
-th,
-td {
-  border-bottom: 1px solid #eee;
-  text-align: left;
-  padding: 0.45rem 0.35rem;
-  vertical-align: top;
-}
-
-tr.removed td {
-  color: #888;
-  text-decoration: line-through;
-}
-
-tr.removed td:last-child {
-  text-decoration: none;
-}
-
-button,
-.buttonish {
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 4px;
-  padding: 0.35rem 0.65rem;
-  font: inherit;
-  cursor: pointer;
-  text-decoration: none;
-  color: inherit;
-}
-
-button.primary {
-  background: #2f6fed;
-  border-color: #2f6fed;
-  color: #fff;
-}
-
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-button.link {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  color: #2f6fed;
-}
-
-.share {
-  border: 0;
-  background: transparent;
-  color: #2f6fed;
-  font-weight: 700;
-  padding: 0;
-}
-
-.add {
-  margin-top: 0.75rem;
-}
-
-.add input {
-  width: 100%;
-  max-width: 24rem;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font: inherit;
-}
-
-.suggest {
-  list-style: none;
-  margin: 0.35rem 0 0;
-  padding: 0;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  max-width: 24rem;
-  background: #fff;
-}
-
-.suggest button {
-  width: 100%;
-  text-align: left;
-  border: 0;
-  border-radius: 0;
+  margin: 0.2rem 0 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
 }
 
 .muted {
-  color: #666;
-  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 500;
 }
 
-.err {
-  color: #b00020;
+.stream {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.9rem;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.meta {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.add {
+  margin-top: 0.85rem;
+  max-width: 28rem;
+}
+
+.removed {
+  color: var(--muted);
+  text-decoration: line-through;
 }
 </style>
