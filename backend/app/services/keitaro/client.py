@@ -80,7 +80,14 @@ class KeitaroClient:
         json: JsonValue | None = None,
     ) -> JsonValue:
         http = self._get_http()
-        response = http.request(method, path, params=params, json=json)
+        try:
+            response = http.request(method, path, params=params, json=json)
+        except httpx.HTTPError as exc:
+            raise KeitaroAPIError(
+                f"Keitaro {method} {path} unreachable: {exc}",
+                status_code=None,
+                payload={"url": self.base_url},
+            ) from exc
 
         if response.status_code >= 400:
             payload: object
