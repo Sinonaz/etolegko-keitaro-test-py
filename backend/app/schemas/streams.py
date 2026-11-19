@@ -14,7 +14,7 @@ class StreamView(BaseModel):
     name: str
     stream_type: str
     position: int
-    schema: str
+    stream_schema: str
     filter_summary: str
     editable: bool
     dirty: bool

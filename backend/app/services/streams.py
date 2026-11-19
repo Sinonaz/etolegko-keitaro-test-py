@@ -171,7 +171,7 @@ def build_editor_response(db: Session, campaign: Campaign) -> StreamsEditorRespo
                 name=draft.name,
                 stream_type=draft.stream_type,
                 position=draft.position,
-                schema=draft.schema,
+                stream_schema=draft.schema,
                 filter_summary=draft.filter_summary,
                 editable=draft.editable,
                 dirty=draft.dirty,

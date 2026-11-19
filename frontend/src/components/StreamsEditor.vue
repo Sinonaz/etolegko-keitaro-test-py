@@ -14,7 +14,7 @@ type StreamRow = {
   name: string
   stream_type: string
   position: number
-  schema: string
+  stream_schema: string
   filter_summary: string
   editable: boolean
   dirty: boolean
@@ -289,7 +289,7 @@ function visibleOffers(stream: StreamRow): OfferRow[] {
         </ul>
       </div>
 
-      <p v-else class="muted">Read-only stream ({{ stream.schema || stream.stream_type }}).</p>
+      <p v-else class="muted">Read-only stream ({{ stream.stream_schema || stream.stream_type }}).</p>
     </article>
 
     <p v-if="dirtyStreamIds.length" class="muted">
