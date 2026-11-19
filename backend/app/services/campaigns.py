@@ -85,12 +85,12 @@ def resolve_campaign_defaults(
             client.list_traffic_sources(),
             settings.keitaro_source_name,
         )
-        if source is None or "id" not in source:
-            raise CampaignServiceError(
-                f"Traffic source '{settings.keitaro_source_name}' not found; "
-                "set KEITARO_SOURCE_ID"
-            )
-        source_id = int(source["id"])
+        if source is not None and "id" in source:
+            source_id = int(source["id"])
+        else:
+            # List endpoint often hides deleted sources (e.g. FORTESTS).
+            # Keitaro accepts traffic_source_id=0 (= none); peers use this too.
+            source_id = 0
 
     return domain_id, group_id, source_id
 
