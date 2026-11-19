@@ -25,7 +25,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 
-# миграции (пока без моделей — пустой versions/)
+# миграции
 alembic upgrade head
 
 uvicorn app.main:app --reload --port 8000
@@ -33,9 +33,11 @@ uvicorn app.main:app --reload --port 8000
 
 - Health: http://127.0.0.1:8000/health  
 - Keitaro status: http://127.0.0.1:8000/keitaro/status  
+- Create campaign: `POST /campaigns` `{name, geo, offer_id}`  
+- Offer search: `GET /offers/search?q=...`  
 - Swagger: http://127.0.0.1:8000/docs  
 
-Заполни `KEITARO_URL` и `KEITARO_API_KEY` в `backend/.env`, затем проверь `/keitaro/status`.
+Заполни `KEITARO_URL` и `KEITARO_API_KEY` в `backend/.env` (и при необходимости ID/имена домена, группы `FORTESTS`, источника). Проверь `/keitaro/status`.
 
 ## Frontend
 

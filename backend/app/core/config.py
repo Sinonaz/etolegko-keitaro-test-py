@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     keitaro_domain_id: int | None = None
     keitaro_group_id: int | None = None
     keitaro_source_id: int | None = None
+    # Used when IDs are empty: resolve by name (assignment defaults)
+    keitaro_domain_name: str = ""
+    keitaro_group_name: str = "FORTESTS"
+    keitaro_source_name: str = "FORTESTS"
+    keitaro_white_page_url: str = "https://google.com"
 
     @field_validator(
         "keitaro_domain_id",

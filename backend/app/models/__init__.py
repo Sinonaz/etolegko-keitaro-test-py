@@ -1,4 +1,4 @@
-# Import models here so Alembic sees them via Base.metadata
 from app.db.base import Base
+from app.models.campaign import Campaign
 
-__all__ = ["Base"]
+__all__ = ["Base", "Campaign"]
