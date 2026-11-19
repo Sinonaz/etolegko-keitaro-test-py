@@ -150,16 +150,19 @@ def create_campaign_with_streams(
         }
     )
 
+    # This Keitaro build rejects schema "offers"; use "landings" with offers[]
+    # (same pattern as existing campaigns on the tracker).
     offer_stream = client.create_stream(
         {
             "campaign_id": campaign_id,
             "type": "default",
             "name": "Default offers",
             "position": 2,
-            "schema": "offers",
+            "schema": "landings",
             "action_type": "http",
             "action_payload": "",
             "collect_clicks": True,
+            "landings": [],
             "offers": [
                 {
                     "offer_id": offer_id,
